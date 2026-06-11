@@ -17,15 +17,15 @@ public final class MatrixSaverView: ScreenSaverView {
         let configuration = RainConfiguration(
             fontSize: 20 * scale,
             glyphSpacing: 22 * scale,
-            trailLength: isPreview ? 28 : 40,
-            minSpeed: 85 * scale,
-            maxSpeed: 300 * scale,
-            mutationChance: 0.012
+            trailLength: isPreview ? 22 : 32,
+            minSpeed: 170 * scale,
+            maxSpeed: 560 * scale,
+            mutationChance: 0.022
         )
         self.engine = RainEngine(width: frame.width, height: frame.height, configuration: configuration)
         self.glyphFont = NSFont.monospacedSystemFont(ofSize: configuration.fontSize, weight: .semibold)
         super.init(frame: frame, isPreview: isPreview)
-        animationTimeInterval = 1.0 / 90.0
+        animationTimeInterval = 1.0 / 60.0
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.cgColor
         glowShadow.shadowColor = NSColor(calibratedRed: 0.0, green: 1.0, blue: 0.27, alpha: 0.9)
@@ -38,7 +38,7 @@ public final class MatrixSaverView: ScreenSaverView {
         self.engine = RainEngine(width: 1280, height: 720, configuration: configuration)
         self.glyphFont = NSFont.monospacedSystemFont(ofSize: configuration.fontSize, weight: .semibold)
         super.init(coder: coder)
-        animationTimeInterval = 1.0 / 90.0
+        animationTimeInterval = 1.0 / 60.0
     }
 
     public override var hasConfigureSheet: Bool { false }
@@ -51,7 +51,7 @@ public final class MatrixSaverView: ScreenSaverView {
 
     public override func animateOneFrame() {
         let now = Date()
-        let delta = min(now.timeIntervalSince(lastFrameDate), 1.0 / 30.0)
+        let delta = min(now.timeIntervalSince(lastFrameDate), 1.0 / 20.0)
         lastFrameDate = now
         engine.update(deltaTime: delta)
         needsDisplay = true

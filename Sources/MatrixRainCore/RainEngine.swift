@@ -11,10 +11,10 @@ public struct RainConfiguration: Equatable, Sendable {
     public init(
         fontSize: Double = 20,
         glyphSpacing: Double = 22,
-        trailLength: Int = 34,
-        minSpeed: Double = 90,
-        maxSpeed: Double = 280,
-        mutationChance: Double = 0.010
+        trailLength: Int = 28,
+        minSpeed: Double = 180,
+        maxSpeed: Double = 540,
+        mutationChance: Double = 0.018
     ) {
         self.fontSize = fontSize
         self.glyphSpacing = glyphSpacing
@@ -98,7 +98,7 @@ public struct RainEngine: Sendable {
             column.glyphs.enumerated().map { offset, glyph in
                 let y = column.headY - Double(offset) * configuration.glyphSpacing
                 let fade = max(0, 1 - Double(offset) / Double(max(configuration.trailLength, 1)))
-                let opacity = offset == 0 ? 1 : pow(fade, 1.45) * 0.82
+                let opacity = offset == 0 ? 1 : pow(fade, 1.7) * 0.86
                 return RainGlyph(
                     character: glyph,
                     x: column.x,

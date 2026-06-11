@@ -1,6 +1,6 @@
 # Matrix Screen Saver for macOS
 
-A Swift macOS screen saver that recreates a Matrix-inspired digital-rain effect: dense green glyph columns, bright leading characters, soft glow, randomized Japanese/kana/Latin/numeric symbols, and calm independent falling speeds per column.
+A Swift macOS screen saver that recreates a Matrix-inspired digital-rain effect: dense green glyph columns, bright leading characters, soft glow, randomized Japanese/kana/Latin/numeric symbols, and independent falling speeds per column.
 
 > Note: this project is an original Matrix-style implementation; it does not include film assets or copied proprietary code.
 
@@ -13,20 +13,9 @@ A Swift macOS screen saver that recreates a Matrix-inspired digital-rain effect:
 - `scripts/install-saver.sh` installs the bundle into `~/Library/Screen Savers/` and opens System Settings.
 - `scripts/uninstall-saver.sh` removes the installed user-level bundle.
 
-## Download from GitHub and install on macOS
-
-Open **Terminal** and run:
-
-```bash
-cd ~/Downloads
-git clone https://github.com/k-r-i-s-h/matrix-ss-mac.git
-cd matrix-ss-mac
-make install
-```
-
 ## Easy install on macOS
 
-If you have already downloaded or cloned the project, run one command from the project folder:
+Run one command from the project folder:
 
 ```bash
 make install
