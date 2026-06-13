@@ -54,3 +54,18 @@ make uninstall
 ```bash
 swift test
 ```
+
+## Performance notes
+
+The renderer is built to stay light on CPU/GPU so it is comfortable as an
+always-on screen saver:
+
+- The animation engine exposes `forEachVisibleGlyph`, an allocation-free hot
+  path the view walks each frame instead of building a fresh glyph array.
+- Trail opacities are precomputed once at startup (no `pow`/division per glyph
+  per frame), and the view caches one `NSColor` per trail position plus reusable
+  attribute dictionaries.
+- The soft glow (an `NSShadow`, the most expensive draw operation here) is
+  applied only to the bright leading glyph of each column. To restore a
+  full-column glow, add `.shadow: glowShadow` to `trailAttributes` in
+  `MatrixSaverView.swift`.

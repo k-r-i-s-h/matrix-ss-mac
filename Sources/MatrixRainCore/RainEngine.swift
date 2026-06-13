@@ -64,12 +64,14 @@ public struct RainEngine: Sendable {
 
     private var columns: [RainColumn] = []
     private var random: SeededGenerator
+    private let opacities: [Double]
 
     public init(width: Double, height: Double, configuration: RainConfiguration = RainConfiguration(), seed: UInt64 = 0x4D41_5452_4958) {
         self.width = max(width, configuration.glyphSpacing)
         self.height = max(height, configuration.glyphSpacing)
         self.configuration = configuration
         self.random = SeededGenerator(seed: seed)
+        self.opacities = RainEngine.makeOpacities(trailLength: configuration.trailLength)
         rebuildColumns()
     }
 
@@ -82,10 +84,11 @@ public struct RainEngine: Sendable {
     public mutating func update(deltaTime: Double) {
         guard deltaTime.isFinite, deltaTime > 0 else { return }
 
+        let resetThreshold = height + Double(configuration.trailLength) * configuration.glyphSpacing
         for index in columns.indices {
             columns[index].headY += columns[index].speed * deltaTime
 
-            if columns[index].headY - Double(configuration.trailLength) * configuration.glyphSpacing > height {
+            if columns[index].headY > resetThreshold {
                 resetColumn(at: index, startAboveScreen: true)
             } else {
                 mutateColumnGlyphs(at: index)
@@ -93,22 +96,45 @@ public struct RainEngine: Sendable {
         }
     }
 
-    public func snapshot() -> [RainGlyph] {
-        columns.flatMap { column in
-            column.glyphs.enumerated().map { offset, glyph in
-                let y = column.headY - Double(offset) * configuration.glyphSpacing
-                let fade = max(0, 1 - Double(offset) / Double(max(configuration.trailLength, 1)))
-                let opacity = offset == 0 ? 1 : pow(fade, 1.7) * 0.86
-                return RainGlyph(
-                    character: glyph,
-                    x: column.x,
-                    y: y,
-                    opacity: opacity,
-                    isHead: offset == 0
-                )
+    /// Per-offset opacities for a column trail (index 0 is the head). Constant
+    /// for the lifetime of the engine, so renderers can precompute colors once.
+    public var glyphOpacities: [Double] { opacities }
+
+    /// Visits every on-screen glyph without allocating an intermediate array.
+    /// This is the hot path used by the renderer on each frame.
+    public func forEachVisibleGlyph(
+        _ body: (_ character: String, _ x: Double, _ y: Double, _ offset: Int) -> Void
+    ) {
+        let spacing = configuration.glyphSpacing
+        let lowerBound = -spacing
+        let upperBound = height + spacing
+
+        for column in columns {
+            let headY = column.headY
+            for offset in column.glyphs.indices {
+                let y = headY - Double(offset) * spacing
+                if y > lowerBound && y < upperBound {
+                    body(column.glyphs[offset], column.x, y, offset)
+                }
             }
         }
-        .filter { $0.y > -configuration.glyphSpacing && $0.y < height + configuration.glyphSpacing }
+    }
+
+    public func snapshot() -> [RainGlyph] {
+        var glyphs: [RainGlyph] = []
+        glyphs.reserveCapacity(columns.count * configuration.trailLength)
+        forEachVisibleGlyph { character, x, y, offset in
+            glyphs.append(
+                RainGlyph(
+                    character: character,
+                    x: x,
+                    y: y,
+                    opacity: opacities[offset],
+                    isHead: offset == 0
+                )
+            )
+        }
+        return glyphs
     }
 
     public var columnCount: Int {
@@ -154,6 +180,17 @@ public struct RainEngine: Sendable {
 
     private mutating func randomGlyph() -> String {
         MatrixGlyphSet.characters[Int(random.next() % UInt64(MatrixGlyphSet.characters.count))]
+    }
+
+    private static func makeOpacities(trailLength: Int) -> [Double] {
+        let count = max(trailLength, 0)
+        guard count > 0 else { return [] }
+        let denominator = Double(max(trailLength, 1))
+        return (0..<count).map { offset in
+            guard offset > 0 else { return 1 }
+            let fade = max(0, 1 - Double(offset) / denominator)
+            return pow(fade, 1.7) * 0.86
+        }
     }
 }
 
