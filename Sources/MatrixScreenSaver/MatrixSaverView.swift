@@ -9,8 +9,21 @@ import MatrixRainCore
 public final class MatrixSaverView: ScreenSaverView {
     private var engine: RainEngine
     private var lastFrameDate = Date()
-    private var glyphFont: NSFont
+    private let glyphFont: NSFont
     private let glowShadow = NSShadow()
+    private let paragraph: NSParagraphStyle = {
+        let style = NSMutableParagraphStyle()
+        style.alignment = .center
+        return style
+    }()
+
+    // One color per trail offset (index 0 is the head), precomputed so the draw
+    // loop never has to allocate an NSColor.
+    private var colorTable: [NSColor] = []
+    // Reused attribute dictionaries. Head glyphs are fully constant; trail glyphs
+    // only ever swap their foreground color.
+    private var headAttributes: [NSAttributedString.Key: Any] = [:]
+    private var trailAttributes: [NSAttributedString.Key: Any] = [:]
 
     public override init?(frame: NSRect, isPreview: Bool) {
         let scale = isPreview ? 0.72 : 1.0
@@ -25,12 +38,7 @@ public final class MatrixSaverView: ScreenSaverView {
         self.engine = RainEngine(width: frame.width, height: frame.height, configuration: configuration)
         self.glyphFont = NSFont.monospacedSystemFont(ofSize: configuration.fontSize, weight: .semibold)
         super.init(frame: frame, isPreview: isPreview)
-        animationTimeInterval = 1.0 / 60.0
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.black.cgColor
-        glowShadow.shadowColor = NSColor(calibratedRed: 0.0, green: 1.0, blue: 0.27, alpha: 0.9)
-        glowShadow.shadowBlurRadius = isPreview ? 4 : 7
-        glowShadow.shadowOffset = .zero
+        configureRendering()
     }
 
     public required init?(coder: NSCoder) {
@@ -38,9 +46,10 @@ public final class MatrixSaverView: ScreenSaverView {
         self.engine = RainEngine(width: 1280, height: 720, configuration: configuration)
         self.glyphFont = NSFont.monospacedSystemFont(ofSize: configuration.fontSize, weight: .semibold)
         super.init(coder: coder)
-        animationTimeInterval = 1.0 / 60.0
+        configureRendering()
     }
 
+    public override var isOpaque: Bool { true }
     public override var hasConfigureSheet: Bool { false }
     public override var configureSheet: NSWindow? { nil }
 
@@ -66,36 +75,57 @@ public final class MatrixSaverView: ScreenSaverView {
         NSColor.black.setFill()
         bounds.fill()
 
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
+        guard !colorTable.isEmpty else { return }
 
-        for glyph in engine.snapshot() {
-            draw(glyph: glyph, paragraph: paragraph)
+        let spacing = engine.configuration.glyphSpacing
+        let halfSpacing = spacing * 0.5
+        let viewHeight = bounds.height
+        let lastColorIndex = colorTable.count - 1
+
+        engine.forEachVisibleGlyph { character, x, y, offset in
+            let drawRect = NSRect(
+                x: x - halfSpacing,
+                y: viewHeight - y,
+                width: spacing,
+                height: spacing
+            )
+            if offset == 0 {
+                character.draw(in: drawRect, withAttributes: headAttributes)
+            } else {
+                trailAttributes[.foregroundColor] = colorTable[min(offset, lastColorIndex)]
+                character.draw(in: drawRect, withAttributes: trailAttributes)
+            }
         }
     }
 
-    private func draw(glyph: RainGlyph, paragraph: NSParagraphStyle) {
-        let color: NSColor
-        if glyph.isHead {
-            color = NSColor(calibratedRed: 0.88, green: 1.0, blue: 0.88, alpha: glyph.opacity)
-        } else {
-            color = NSColor(calibratedRed: 0.0, green: 0.95, blue: 0.25, alpha: glyph.opacity)
+    private func configureRendering() {
+        animationTimeInterval = 1.0 / 60.0
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.black.cgColor
+
+        glowShadow.shadowColor = NSColor(calibratedRed: 0.0, green: 1.0, blue: 0.27, alpha: 0.9)
+        glowShadow.shadowBlurRadius = isPreview ? 4 : 7
+        glowShadow.shadowOffset = .zero
+
+        colorTable = engine.glyphOpacities.enumerated().map { offset, opacity in
+            offset == 0
+                ? NSColor(calibratedRed: 0.88, green: 1.0, blue: 0.88, alpha: opacity)
+                : NSColor(calibratedRed: 0.0, green: 0.95, blue: 0.25, alpha: opacity)
         }
 
-        let attributes: [NSAttributedString.Key: Any] = [
+        // The bright leading glyph keeps the soft glow; trail glyphs skip the
+        // shadow, which is by far the biggest per-frame rendering saving. To
+        // restore a full-column glow, add `.shadow: glowShadow` to trailAttributes.
+        headAttributes = [
             .font: glyphFont,
-            .foregroundColor: color,
             .paragraphStyle: paragraph,
+            .foregroundColor: colorTable.first ?? NSColor(calibratedRed: 0.88, green: 1.0, blue: 0.88, alpha: 1),
             .shadow: glowShadow
         ]
-
-        let drawRect = NSRect(
-            x: glyph.x - engine.configuration.glyphSpacing * 0.5,
-            y: bounds.height - glyph.y,
-            width: engine.configuration.glyphSpacing,
-            height: engine.configuration.glyphSpacing
-        )
-        glyph.character.draw(in: drawRect, withAttributes: attributes)
+        trailAttributes = [
+            .font: glyphFont,
+            .paragraphStyle: paragraph
+        ]
     }
 }
 #endif
